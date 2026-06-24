@@ -39,7 +39,7 @@ const bookingMobileHeaders = {
   'x-booking-language': regex('[a-z]{2}-[A-Z]{2}', 'en-US'),
   'x-booking-platform': regex('ios|android', 'ios'),
   'x-booking-client': string('mobile'),
-  'Content-Type': regex('application/json.*', 'application/json'),
+  'Content-Type': 'application/json',
 };
 
 describe('Attractions API — Mobile Consumer Contract (GraphQL)', () => {

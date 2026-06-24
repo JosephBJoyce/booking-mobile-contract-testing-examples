@@ -266,7 +266,7 @@ describe('Flights API — Mobile Consumer Contract', () => {
             path: '/v1/bookings',
             headers: {
               ...bookingMobileHeaders,
-              'Content-Type': regex('application/json.*', 'application/json'),
+              'Content-Type': 'application/json',
             },
             body: {
               flightId: string('AMS-LHR-20250901-001'),
