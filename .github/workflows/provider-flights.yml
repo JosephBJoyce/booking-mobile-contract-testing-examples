@@ -97,6 +97,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
       - name: Deploy Flights API (replace with your actual deploy step)
         run: |
           echo "Deploying booking-flights-api @ ${{ github.sha }} to production"
