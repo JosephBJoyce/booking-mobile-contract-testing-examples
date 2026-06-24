@@ -1,0 +1,399 @@
+openapi: "3.0.3"
+info:
+  title: Booking.com Flights API
+  description: |
+    REST API for searching and booking flights on the Booking.com mobile platform.
+    All requests require an identity token in the Authorization header.
+  version: "1.0.0"
+  contact:
+    name: Flights Platform Team
+    email: flights-platform@booking.com
+
+servers:
+  - url: https://flights.booking.com
+    description: Production
+  - url: http://localhost:3001
+    description: Local development
+
+tags:
+  - name: flights
+    description: Flight search and details
+  - name: bookings
+    description: Flight booking operations
+
+components:
+  securitySchemes:
+    IdentityToken:
+      type: http
+      scheme: bearer
+      description: Booking.com identity token (required for all requests)
+
+  parameters:
+    BookingLanguage:
+      name: x-booking-language
+      in: header
+      schema:
+        type: string
+        pattern: "^[a-z]{2}-[A-Z]{2}$"
+        example: en-US
+    BookingPlatform:
+      name: x-booking-platform
+      in: header
+      schema:
+        type: string
+        enum: [ios, android]
+        example: ios
+
+  schemas:
+    Airport:
+      type: object
+      required: [iata, name, city, country]
+      properties:
+        iata:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          example: AMS
+        name:
+          type: string
+          example: Amsterdam Airport Schiphol
+        city:
+          type: string
+          example: Amsterdam
+        country:
+          type: string
+          pattern: "^[A-Z]{2}$"
+          example: NL
+        terminal:
+          type: string
+          example: "2"
+
+    Airline:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Z]{2}$"
+          example: KL
+        name:
+          type: string
+          example: KLM Royal Dutch Airlines
+        logoUrl:
+          type: string
+          format: uri
+
+    Price:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          example: 149.99
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          example: EUR
+
+    FlightSummary:
+      type: object
+      required: [flightId, origin, destination, departureTime, arrivalTime, durationMinutes, airline, price, availableSeats, cabinClass]
+      properties:
+        flightId:
+          type: string
+          example: AMS-LHR-20250901-001
+        origin:
+          type: string
+          description: IATA code
+          example: AMS
+        destination:
+          type: string
+          description: IATA code
+          example: LHR
+        departureTime:
+          type: string
+          format: date-time
+        arrivalTime:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          example: 90
+        airline:
+          $ref: "#/components/schemas/Airline"
+        price:
+          $ref: "#/components/schemas/Price"
+        availableSeats:
+          type: integer
+          minimum: 0
+        cabinClass:
+          type: string
+          enum: [economy, premium_economy, business, first]
+
+    FlightDetail:
+      allOf:
+        - $ref: "#/components/schemas/FlightSummary"
+        - type: object
+          properties:
+            origin:
+              $ref: "#/components/schemas/Airport"
+            destination:
+              $ref: "#/components/schemas/Airport"
+            aircraft:
+              type: string
+            price:
+              allOf:
+                - $ref: "#/components/schemas/Price"
+                - type: object
+                  properties:
+                    breakdown:
+                      type: object
+                      properties:
+                        baseFare:
+                          type: number
+                        taxes:
+                          type: number
+                        fees:
+                          type: number
+            baggage:
+              type: object
+              properties:
+                carryOn:
+                  type: object
+                  properties:
+                    included:
+                      type: boolean
+                    maxWeightKg:
+                      type: number
+                checked:
+                  type: object
+                  properties:
+                    included:
+                      type: boolean
+                    pricePerBag:
+                      type: number
+
+    Passenger:
+      type: object
+      required: [firstName, lastName, dateOfBirth, passportNumber]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        passportNumber:
+          type: string
+
+    BookingConfirmation:
+      type: object
+      required: [bookingId, status, flightId, confirmationCode, totalPrice, passengerCount, contactEmail, createdAt]
+      properties:
+        bookingId:
+          type: string
+          pattern: "^BK-[A-Z0-9]{8}$"
+          example: BK-ABC12345
+        status:
+          type: string
+          enum: [CONFIRMED, PENDING, CANCELLED]
+        flightId:
+          type: string
+        confirmationCode:
+          type: string
+          example: KL4R2X
+        totalPrice:
+          $ref: "#/components/schemas/Price"
+        passengerCount:
+          type: integer
+        contactEmail:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+
+security:
+  - IdentityToken: []
+
+paths:
+  /v1/flights/search:
+    get:
+      operationId: searchFlights
+      summary: Search for available flights
+      tags: [flights]
+      parameters:
+        - $ref: "#/components/parameters/BookingLanguage"
+        - $ref: "#/components/parameters/BookingPlatform"
+        - name: origin
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Z]{3}$"
+          description: Departure airport IATA code
+          example: AMS
+        - name: destination
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Z]{3}$"
+          description: Arrival airport IATA code
+          example: LHR
+        - name: departureDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-09-01"
+        - name: returnDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: passengers
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+            default: 1
+        - name: cabinClass
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [economy, premium_economy, business, first]
+            default: economy
+      responses:
+        "200":
+          description: List of available flights
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [flights, totalResults]
+                properties:
+                  flights:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FlightSummary"
+                  totalResults:
+                    type: integer
+        "400":
+          description: Missing or invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid identity token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/flights/{flightId}:
+    get:
+      operationId: getFlight
+      summary: Get full details for a specific flight
+      tags: [flights]
+      parameters:
+        - $ref: "#/components/parameters/BookingLanguage"
+        - $ref: "#/components/parameters/BookingPlatform"
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AMS-LHR-20250901-001
+      responses:
+        "200":
+          description: Flight details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightDetail"
+        "401":
+          description: Missing or invalid identity token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/bookings:
+    post:
+      operationId: createFlightBooking
+      summary: Create a flight booking
+      tags: [bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flightId, passengers, contactEmail]
+              properties:
+                flightId:
+                  type: string
+                passengers:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/components/schemas/Passenger"
+                contactEmail:
+                  type: string
+                  format: email
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingConfirmation"
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid identity token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

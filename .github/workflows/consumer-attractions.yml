@@ -1,0 +1,109 @@
+##
+## Consumer CI — Attractions Mobile Consumer (GraphQL / BDCT)
+##
+## Triggered on: pushes to any branch that touch the attractions consumer
+##
+## Flow:
+##   1. Run Pact consumer tests (GraphQL as HTTP POST) → generates pact file
+##   2. Publish pact to PactFlow
+##   3. can-i-deploy check — PactFlow cross-verifies against the Attractions OpenAPI spec
+##   4. Deploy (simulated — replace with your real deploy step)
+##   5. Record deployment in PactFlow
+##
+## Note: Because this consumer uses BDCT, can-i-deploy does NOT require the provider
+## to re-run tests when this consumer publishes a new pact. PactFlow performs the
+## cross-contract verification automatically against the published OpenAPI spec.
+##
+
+name: Consumer — Attractions Mobile
+
+on:
+  push:
+    paths:
+      - 'consumers/attractions-mobile-consumer/**'
+      - '.github/workflows/consumer-attractions.yml'
+
+env:
+  PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  test-and-publish:
+    name: Pact Tests & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: consumers/attractions-mobile-consumer/package-lock.json
+
+      - name: Install dependencies
+        working-directory: consumers/attractions-mobile-consumer
+        run: npm ci
+
+      - name: Run Pact consumer tests
+        working-directory: consumers/attractions-mobile-consumer
+        run: npm test
+        env:
+          CI: true
+
+      - name: Publish pacts to PactFlow
+        working-directory: consumers/attractions-mobile-consumer
+        run: |
+          npx pact-broker publish ./pacts \
+            --consumer-app-version="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --broker-base-url="${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token="${{ env.PACT_BROKER_TOKEN }}"
+
+  can-i-deploy:
+    name: can-i-deploy Check
+    needs: test-and-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
+      # In BDCT, PactFlow performs the cross-contract verification automatically
+      # when the pact is published. can-i-deploy checks the result of that.
+      - name: can-i-deploy — check compatibility with production
+        run: |
+          npx pact-broker can-i-deploy \
+            --pacticipant "booking-attractions-mobile-consumer" \
+            --version "${{ github.sha }}" \
+            --to-environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
+
+  deploy:
+    name: Deploy
+    needs: can-i-deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy (replace with your actual deploy step)
+        run: |
+          echo "Deploying booking-attractions-mobile-consumer @ ${{ github.sha }} to production"
+
+      - name: Record deployment in PactFlow
+        run: |
+          npx pact-broker record-deployment \
+            --pacticipant "booking-attractions-mobile-consumer" \
+            --version "${{ github.sha }}" \
+            --environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"

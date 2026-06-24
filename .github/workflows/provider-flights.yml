@@ -1,0 +1,113 @@
+##
+## Provider CI — Flights API (Classic CDC)
+##
+## Triggered on:
+##   - Pushes to the flights-api service
+##   - Webhook from PactFlow when a consumer publishes a new/changed pact
+##     (configure the webhook in PactFlow to POST to this workflow)
+##
+## Flow:
+##   1. Run provider pact verification (fetches pacts from PactFlow, verifies against real app)
+##   2. Results automatically published to PactFlow by the Verifier
+##   3. can-i-deploy check
+##   4. Deploy
+##   5. Record deployment
+##
+## Why trigger on consumer pact changes?
+##   Without a webhook, a consumer could publish a new pact on Monday and the provider
+##   would only verify it on Friday (their next push). The webhook makes the feedback loop
+##   immediate — the consumer knows within minutes whether their new interaction is safe.
+##
+
+name: Provider — Flights API
+
+on:
+  push:
+    paths:
+      - 'services/flights-api/**'
+      - '.github/workflows/provider-flights.yml'
+  # Triggered by PactFlow webhook when a consumer pact changes
+  repository_dispatch:
+    types: [pact_changed_flights_api]
+
+env:
+  PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  verify-pacts:
+    name: Verify Consumer Pacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/flights-api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/flights-api
+        run: npm ci
+
+      # The Verifier fetches all relevant pacts from PactFlow using:
+      #   - mainBranch: true       — latest consumer main
+      #   - matchingBranch: true   — same feature branch for pair-testing
+      #   - deployedOrReleased: true — ALL versions live anywhere (critical for can-i-deploy)
+      # Results are published back to PactFlow automatically (publishVerificationResults: true)
+      - name: Run provider pact verification
+        working-directory: services/flights-api
+        run: npm run test:pact
+        env:
+          CI: true
+          GIT_COMMIT: ${{ github.sha }}
+          GIT_BRANCH: ${{ github.ref_name }}
+          PACT_BROKER_BASE_URL: ${{ env.PACT_BROKER_BASE_URL }}
+          PACT_BROKER_TOKEN: ${{ env.PACT_BROKER_TOKEN }}
+
+  can-i-deploy:
+    name: can-i-deploy Check
+    needs: verify-pacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
+      - name: can-i-deploy — check all consumers in production
+        run: |
+          npx pact-broker can-i-deploy \
+            --pacticipant "booking-flights-api" \
+            --version "${{ github.sha }}" \
+            --to-environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
+
+  deploy:
+    name: Deploy
+    needs: can-i-deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Flights API (replace with your actual deploy step)
+        run: |
+          echo "Deploying booking-flights-api @ ${{ github.sha }} to production"
+          # e.g. kubectl set image deployment/flights-api flights-api=bookingcom/flights-api:${{ github.sha }}
+
+      - name: Record deployment in PactFlow
+        run: |
+          npx pact-broker record-deployment \
+            --pacticipant "booking-flights-api" \
+            --version "${{ github.sha }}" \
+            --environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"

@@ -1,0 +1,113 @@
+##
+## Consumer CI — Flights Mobile Consumer (Classic CDC)
+##
+## Triggered on: pushes to any branch that touch the flights consumer
+##
+## Flow:
+##   1. Run Pact consumer tests → generates pact file
+##   2. Publish pact + branch/version to PactFlow
+##   3. can-i-deploy check (gates the deploy step)
+##   4. Deploy (simulated here — replace with your real deploy step)
+##   5. Record deployment in PactFlow so other services know this version is live
+##
+
+name: Consumer — Flights Mobile
+
+on:
+  push:
+    paths:
+      - 'consumers/flights-mobile-consumer/**'
+      - '.github/workflows/consumer-flights.yml'
+
+env:
+  PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  test-and-publish:
+    name: Pact Tests & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: consumers/flights-mobile-consumer/package-lock.json
+
+      - name: Install dependencies
+        working-directory: consumers/flights-mobile-consumer
+        run: npm ci
+
+      - name: Run Pact consumer tests
+        working-directory: consumers/flights-mobile-consumer
+        run: npm test
+        env:
+          CI: true
+
+      # The pact file generated above is published to PactFlow with the git commit SHA
+      # as the version and the branch name for selector-based can-i-deploy.
+      - name: Publish pacts to PactFlow
+        working-directory: consumers/flights-mobile-consumer
+        run: |
+          npx pact-broker publish ./pacts \
+            --consumer-app-version="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --broker-base-url="${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token="${{ env.PACT_BROKER_TOKEN }}"
+
+  can-i-deploy:
+    name: can-i-deploy Check
+    needs: test-and-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
+      # can-i-deploy checks whether this consumer version is compatible with the
+      # version of booking-flights-api currently deployed to production.
+      # If the provider has not yet verified this pact, this step will fail —
+      # that is the intended behaviour (shift-left safety gate).
+      - name: can-i-deploy — check compatibility with production
+        run: |
+          npx pact-broker can-i-deploy \
+            --pacticipant "booking-flights-mobile-consumer" \
+            --version "${{ github.sha }}" \
+            --to-environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
+
+  deploy:
+    name: Deploy
+    needs: can-i-deploy
+    runs-on: ubuntu-latest
+    # Only deploy from main branch
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy (replace with your actual deploy step)
+        run: |
+          echo "Deploying booking-flights-mobile-consumer @ ${{ github.sha }} to production"
+          # e.g. kubectl set image ... or helm upgrade ...
+
+      # Record the deployment so PactFlow knows which consumer version is live.
+      # This is what makes can-i-deploy work for future provider changes.
+      - name: Record deployment in PactFlow
+        run: |
+          npx pact-broker record-deployment \
+            --pacticipant "booking-flights-mobile-consumer" \
+            --version "${{ github.sha }}" \
+            --environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"

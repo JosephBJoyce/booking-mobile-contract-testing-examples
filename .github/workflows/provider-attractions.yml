@@ -1,0 +1,124 @@
+##
+## Provider CI — Attractions API (BDCT)
+##
+## Triggered on: pushes to the attractions-api service
+##
+## Flow:
+##   1. Run self-verification tests against the real Apollo server
+##      → produces verification-results.json
+##   2. Publish the OpenAPI spec + verification results to PactFlow
+##      (this is the BDCT "provider contract" — NOT a pact file)
+##   3. PactFlow automatically cross-verifies all consumer pacts against the OpenAPI spec
+##   4. can-i-deploy check (reads the cross-verification result)
+##   5. Deploy
+##   6. Record deployment
+##
+## Why BDCT for Attractions?
+##   The Attractions team already maintains an OpenAPI spec (used for DML schema federation
+##   and internal documentation). BDCT lets PactFlow verify consumers against that spec
+##   automatically — the Attractions CI does not need to know about or run consumer tests.
+##   This is ideal for teams migrating from an OpenAPI-first workflow.
+##
+
+name: Provider — Attractions API (BDCT)
+
+on:
+  push:
+    paths:
+      - 'services/attractions-api/**'
+      - '.github/workflows/provider-attractions.yml'
+
+env:
+  PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  self-verify:
+    name: Self-Verification (BDCT)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/attractions-api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/attractions-api
+        run: npm ci
+
+      # Runs tests against the real Apollo server and writes verification-results.json
+      - name: Run BDCT self-verification tests
+        working-directory: services/attractions-api
+        run: npm run test:bdct
+        env:
+          CI: true
+          GIT_COMMIT: ${{ github.sha }}
+
+      # Publish the OpenAPI spec AND the self-verification results to PactFlow.
+      # This is the BDCT provider contract publication step.
+      # PactFlow will then cross-verify all consumer pacts against the OpenAPI spec.
+      - name: Publish provider contract to PactFlow (BDCT)
+        working-directory: services/attractions-api
+        run: |
+          npx pact-broker publish-provider-contract \
+            openapi/attractions-api.yml \
+            --provider "booking-attractions-api" \
+            --provider-app-version "${{ github.sha }}" \
+            --branch "${{ github.ref_name }}" \
+            --content-type "application/yaml" \
+            --verification-results "./verification-results.json" \
+            --verification-results-content-type "application/json" \
+            --verifier "jest" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
+
+  can-i-deploy:
+    name: can-i-deploy Check
+    needs: self-verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
+      # PactFlow has already performed the cross-contract verification by the time
+      # this step runs. can-i-deploy reads the result of that verification.
+      - name: can-i-deploy — check all consumers in production
+        run: |
+          npx pact-broker can-i-deploy \
+            --pacticipant "booking-attractions-api" \
+            --version "${{ github.sha }}" \
+            --to-environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
+
+  deploy:
+    name: Deploy
+    needs: can-i-deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Attractions API (replace with your actual deploy step)
+        run: |
+          echo "Deploying booking-attractions-api @ ${{ github.sha }} to production"
+          # e.g. helm upgrade attractions-api ./charts/attractions-api --set image.tag=${{ github.sha }}
+
+      - name: Record deployment in PactFlow
+        run: |
+          npx pact-broker record-deployment \
+            --pacticipant "booking-attractions-api" \
+            --version "${{ github.sha }}" \
+            --environment "production" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"

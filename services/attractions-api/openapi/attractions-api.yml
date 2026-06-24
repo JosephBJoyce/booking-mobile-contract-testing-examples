@@ -1,0 +1,285 @@
+openapi: "3.0.3"
+info:
+  title: Booking.com Attractions API
+  description: |
+    GraphQL API for searching and booking attractions on the Booking.com mobile platform.
+    All operations are served via a single POST /graphql endpoint (Apollo Federation / DML).
+    This OpenAPI spec describes the HTTP transport layer for BDCT purposes.
+  version: "1.0.0"
+  contact:
+    name: Attractions Platform Team
+    email: attractions-platform@booking.com
+
+servers:
+  - url: https://attractions.booking.com
+    description: Production (DML endpoint)
+  - url: http://localhost:3002
+    description: Local development
+
+tags:
+  - name: graphql
+    description: GraphQL endpoint — all Attractions API operations
+
+components:
+  securitySchemes:
+    IdentityToken:
+      type: http
+      scheme: bearer
+      description: Booking.com identity token (required for mutations, recommended for queries)
+
+  schemas:
+    GraphQLRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: GraphQL query or mutation string
+        variables:
+          type: object
+          description: GraphQL variables
+          additionalProperties: true
+        operationName:
+          type: string
+
+    GraphQLResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    GraphQLError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        extensions:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHORIZED, NOT_FOUND, BAD_USER_INPUT, INTERNAL_SERVER_ERROR]
+
+    # ─── Data types returned in GraphQL responses ─────────────────────────────
+
+    Coordinates:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    Location:
+      type: object
+      required: [city, country, coordinates]
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+          pattern: "^[A-Z]{2}$"
+        coordinates:
+          $ref: "#/components/schemas/Coordinates"
+
+    Price:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+
+    Attraction:
+      type: object
+      required: [id, name, location, price, availableDates, category, images]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        location:
+          $ref: "#/components/schemas/Location"
+        price:
+          $ref: "#/components/schemas/Price"
+        rating:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+          nullable: true
+        availableDates:
+          type: array
+          items:
+            type: string
+            format: date
+        category:
+          type: string
+          enum: [MUSEUMS, NATURE, TOURS, ENTERTAINMENT, FOOD_AND_DRINK, SPORTS, WELLNESS]
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    AttractionBooking:
+      type: object
+      required: [bookingId, status, attractionId, date, participants, totalPrice, confirmationCode]
+      properties:
+        bookingId:
+          type: string
+          pattern: "^ATB-[A-Z0-9]{8}$"
+        status:
+          type: string
+          enum: [CONFIRMED, PENDING, CANCELLED]
+        attractionId:
+          type: string
+        date:
+          type: string
+          format: date
+        participants:
+          type: integer
+          minimum: 1
+        totalPrice:
+          $ref: "#/components/schemas/Price"
+        confirmationCode:
+          type: string
+
+security:
+  - IdentityToken: []
+  - {}   # queries can be made without auth
+
+paths:
+  /graphql:
+    post:
+      operationId: graphql
+      summary: GraphQL endpoint (all Attractions API operations)
+      description: |
+        Single endpoint for all Attractions API queries and mutations.
+        All requests must include the Booking mobile headers.
+        Mutations require a valid identity token.
+      tags: [graphql]
+      parameters:
+        - name: x-booking-language
+          in: header
+          schema:
+            type: string
+            pattern: "^[a-z]{2}-[A-Z]{2}$"
+            example: en-US
+        - name: x-booking-platform
+          in: header
+          schema:
+            type: string
+            enum: [ios, android]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            examples:
+              searchAttractions:
+                summary: Search for attractions
+                value:
+                  query: "query SearchAttractions($location: String!, $date: String!, $category: String) { searchAttractions(location: $location, date: $date, category: $category) { id name description price { amount currency } rating category } }"
+                  variables:
+                    location: Amsterdam
+                    date: "2025-09-01"
+                    category: MUSEUMS
+              getAttraction:
+                summary: Get a specific attraction
+                value:
+                  query: "query GetAttraction($id: ID!) { getAttraction(id: $id) { id name description location { city country coordinates { lat lng } } price { amount currency } rating availableDates category images } }"
+                  variables:
+                    id: attr-rijksmuseum-001
+              bookAttraction:
+                summary: Book an attraction
+                value:
+                  query: "mutation BookAttraction($input: BookAttractionInput!) { bookAttraction(input: $input) { bookingId status attractionId date participants totalPrice { amount currency } confirmationCode } }"
+                  variables:
+                    input:
+                      attractionId: attr-rijksmuseum-001
+                      date: "2025-09-01"
+                      participants: 2
+                      contactEmail: user@example.com
+      responses:
+        "200":
+          description: |
+            GraphQL response. Note: GraphQL always returns 200 even for errors.
+            Check the `errors` field for application-level errors.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLResponse"
+              examples:
+                searchSuccess:
+                  summary: Successful search response
+                  value:
+                    data:
+                      searchAttractions:
+                        - id: attr-rijksmuseum-001
+                          name: Rijksmuseum
+                          price:
+                            amount: 22.50
+                            currency: EUR
+                          rating: 4.8
+                          category: MUSEUMS
+                bookingSuccess:
+                  summary: Successful booking response
+                  value:
+                    data:
+                      bookAttraction:
+                        bookingId: ATB-XY12AB34
+                        status: CONFIRMED
+                        attractionId: attr-rijksmuseum-001
+                        date: "2025-09-01"
+                        participants: 2
+                        totalPrice:
+                          amount: 45.00
+                          currency: EUR
+                        confirmationCode: RIJKS9Z
+                unauthorized:
+                  summary: Auth error (GraphQL error in response body)
+                  value:
+                    errors:
+                      - message: A valid identity token is required
+                        extensions:
+                          code: UNAUTHORIZED
+        "400":
+          description: Malformed request (not a valid GraphQL document)
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Service health check
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: booking-attractions-api
