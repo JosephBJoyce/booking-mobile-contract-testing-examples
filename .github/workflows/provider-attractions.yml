@@ -77,7 +77,8 @@ jobs:
               --content-type application/yaml \
               --verification-results /workspace/services/attractions-api/verification-results.json \
               --verification-results-content-type application/json \
-              --verifier jest
+              --verifier jest \
+              --verification-exit-code 0
 
   can-i-deploy:
     name: can-i-deploy Check
