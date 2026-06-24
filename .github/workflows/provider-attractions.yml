@@ -58,23 +58,24 @@ jobs:
           GIT_COMMIT: ${{ github.sha }}
 
       # Publish the OpenAPI spec AND the self-verification results to PactFlow.
-      # Uses the official PactFlow GitHub Action, which bundles the pactflow CLI internally.
+      # Uses the pact_broker-client Ruby gem (Ruby is pre-installed on ubuntu-latest).
       # PactFlow will then cross-verify all consumer pacts against the OpenAPI spec.
+      - name: Install pact-broker CLI
+        run: gem install pact_broker-client --no-document
+
       - name: Publish provider contract to PactFlow (BDCT)
-        uses: pactflow/actions/publish-provider-contract@v1
-        env:
-          PACT_BROKER_BASE_URL: ${{ env.PACT_BROKER_BASE_URL }}
-          PACT_BROKER_TOKEN: ${{ env.PACT_BROKER_TOKEN }}
-        with:
-          contract-file: services/attractions-api/openapi/attractions-api.yml
-          contract-format: oas
-          provider-app-version: ${{ github.sha }}
-          branch: ${{ github.ref_name }}
-          verification-results: services/attractions-api/verification-results.json
-          verification-exit-code: 0
-          verification-results-format: genericjson
-          verifier: jest
-          verifier-version: '29.7.0'
+        run: |
+          pact-broker publish-provider-contract \
+            services/attractions-api/openapi/attractions-api.yml \
+            --provider "booking-attractions-api" \
+            --provider-app-version "${{ github.sha }}" \
+            --branch "${{ github.ref_name }}" \
+            --content-type application/yaml \
+            --verification-results services/attractions-api/verification-results.json \
+            --verification-results-content-type application/json \
+            --verifier jest \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}"
 
   can-i-deploy:
     name: can-i-deploy Check
