@@ -66,9 +66,11 @@ describe('Flights API — Provider Pact Verification', () => {
       includeWipPactsSince: '2024-01-01',
 
       // Publish results back to PactFlow (only in CI — never from developer laptops)
-      publishVerificationResults: process.env.PUBLISH_PACT_RESULTS === 'true',
-      providerVersion: process.env.GIT_COMMIT,
-      providerVersionBranch: process.env.GIT_BRANCH || 'main',
+      // publishVerificationResults is also driven by the PACT_BROKER_PUBLISH_VERIFICATION_RESULTS
+      // env var (set in the workflow), which the Rust FFI picks up directly.
+      publishVerificationResults: true,
+      providerVersion: process.env.GITHUB_SHA || process.env.GIT_COMMIT,
+      providerVersionBranch: process.env.GITHUB_REF_NAME || process.env.GIT_BRANCH || 'main',
 
       // Provider state handlers — called before each interaction that declares a state.
       // These seed the in-memory data store so the server responds correctly.

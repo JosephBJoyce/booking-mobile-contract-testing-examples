@@ -60,11 +60,11 @@ jobs:
         working-directory: services/flights-api
         run: npm run test:pact
         env:
-          PUBLISH_PACT_RESULTS: 'true'
-          GIT_COMMIT: ${{ github.sha }}
-          GIT_BRANCH: ${{ github.ref_name }}
+          # PACT_BROKER_PUBLISH_VERIFICATION_RESULTS is read directly by the Rust FFI
+          PACT_BROKER_PUBLISH_VERIFICATION_RESULTS: 'true'
           PACT_BROKER_BASE_URL: ${{ env.PACT_BROKER_BASE_URL }}
           PACT_BROKER_TOKEN: ${{ env.PACT_BROKER_TOKEN }}
+          # GITHUB_SHA and GITHUB_REF_NAME are set automatically by GitHub Actions
 
   can-i-deploy:
     name: can-i-deploy Check
