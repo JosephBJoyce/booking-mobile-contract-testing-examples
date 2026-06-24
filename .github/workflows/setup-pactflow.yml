@@ -1,0 +1,114 @@
+##
+## PactFlow Setup
+##
+## Run this workflow ONCE before running the consumer/provider workflows.
+## It registers the four pacticipants and the production + staging environments
+## in smart-bank.pactflow.io.
+##
+## Trigger manually from: Actions → PactFlow Setup → Run workflow
+##
+## It is safe to re-run — existing pacticipants and environments are left unchanged.
+##
+
+name: PactFlow Setup
+
+on:
+  workflow_dispatch:
+
+env:
+  PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+
+jobs:
+  setup:
+    name: Register Environments & Pacticipants
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ─── Environments ──────────────────────────────────────────────
+
+      - name: Create production environment
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/environments" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"production","displayName":"Production","production":true}')
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "✓ production environment created"
+          elif [ "$STATUS" = "409" ]; then
+            echo "✓ production environment already exists"
+          else
+            echo "Unexpected status creating production environment: $STATUS" && exit 1
+          fi
+
+      - name: Create staging environment
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/environments" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"staging","displayName":"Staging","production":false}')
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "✓ staging environment created"
+          elif [ "$STATUS" = "409" ]; then
+            echo "✓ staging environment already exists"
+          else
+            echo "Unexpected status creating staging environment: $STATUS" && exit 1
+          fi
+
+      # ─── Pacticipants ──────────────────────────────────────────────
+
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
+      - name: Register booking-flights-mobile-consumer
+        run: |
+          npx pact-broker create-or-update-pacticipant \
+            --name "booking-flights-mobile-consumer" \
+            --display-name "Booking Flights Mobile Consumer" \
+            --main-branch "main" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+
+      - name: Register booking-flights-api
+        run: |
+          npx pact-broker create-or-update-pacticipant \
+            --name "booking-flights-api" \
+            --display-name "Booking Flights API" \
+            --main-branch "main" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+
+      - name: Register booking-attractions-mobile-consumer
+        run: |
+          npx pact-broker create-or-update-pacticipant \
+            --name "booking-attractions-mobile-consumer" \
+            --display-name "Booking Attractions Mobile Consumer" \
+            --main-branch "main" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+
+      - name: Register booking-attractions-api
+        run: |
+          npx pact-broker create-or-update-pacticipant \
+            --name "booking-attractions-api" \
+            --display-name "Booking Attractions API" \
+            --main-branch "main" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+
+      - name: Setup complete
+        run: |
+          echo ""
+          echo "=== PactFlow workspace ready ==="
+          echo "Broker: ${{ env.PACT_BROKER_BASE_URL }}"
+          echo ""
+          echo "Registered:"
+          echo "  Environments: production, staging"
+          echo "  Pacticipants: booking-flights-mobile-consumer, booking-flights-api,"
+          echo "                booking-attractions-mobile-consumer, booking-attractions-api"
+          echo ""
+          echo "Next: run the consumer workflows, then the provider workflows."

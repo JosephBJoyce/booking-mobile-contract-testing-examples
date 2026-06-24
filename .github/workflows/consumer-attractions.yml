@@ -22,6 +22,7 @@ on:
     paths:
       - 'consumers/attractions-mobile-consumer/**'
       - '.github/workflows/consumer-attractions.yml'
+  workflow_dispatch:
 
 env:
   PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io

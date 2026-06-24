@@ -27,6 +27,7 @@ on:
     paths:
       - 'services/attractions-api/**'
       - '.github/workflows/provider-attractions.yml'
+  workflow_dispatch:
 
 env:
   PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io

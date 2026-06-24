@@ -26,6 +26,7 @@ on:
     paths:
       - 'services/flights-api/**'
       - '.github/workflows/provider-flights.yml'
+  workflow_dispatch:
   # Triggered by PactFlow webhook when a consumer pact changes
   repository_dispatch:
     types: [pact_changed_flights_api]

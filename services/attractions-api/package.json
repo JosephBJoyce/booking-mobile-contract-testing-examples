@@ -15,7 +15,8 @@
     "graphql": "^16.8.1",
     "body-parser": "^1.20.2",
     "dotenv": "^16.3.1",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "graphql-tag": "^2.12.6"
   },
   "devDependencies": {
     "@pact-foundation/pact": "^13.1.3",

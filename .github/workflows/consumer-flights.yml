@@ -18,6 +18,7 @@ on:
     paths:
       - 'consumers/flights-mobile-consumer/**'
       - '.github/workflows/consumer-flights.yml'
+  workflow_dispatch:
 
 env:
   PACT_BROKER_BASE_URL: https://smart-bank.pactflow.io
