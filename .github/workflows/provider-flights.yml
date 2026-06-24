@@ -60,7 +60,7 @@ jobs:
         working-directory: services/flights-api
         run: npm run test:pact
         env:
-          CI: true
+          PUBLISH_PACT_RESULTS: 'true'
           GIT_COMMIT: ${{ github.sha }}
           GIT_BRANCH: ${{ github.ref_name }}
           PACT_BROKER_BASE_URL: ${{ env.PACT_BROKER_BASE_URL }}

@@ -66,8 +66,8 @@ describe('Flights API — Provider Pact Verification', () => {
       includeWipPactsSince: '2024-01-01',
 
       // Publish results back to PactFlow (only in CI — never from developer laptops)
-      publishVerificationResults: process.env.CI === 'true',
-      providerVersion: process.env.GIT_COMMIT || 'local',
+      publishVerificationResults: process.env.PUBLISH_PACT_RESULTS === 'true',
+      providerVersion: process.env.GIT_COMMIT,
       providerVersionBranch: process.env.GIT_BRANCH || 'main',
 
       // Provider state handlers — called before each interaction that declares a state.
@@ -106,7 +106,7 @@ describe('Flights API — Provider Pact Verification', () => {
         next();
       },
 
-      logLevel: 'warn',
+      logLevel: 'info',
     });
 
     return verifier.verifyProvider();
