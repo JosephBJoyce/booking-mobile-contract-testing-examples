@@ -61,7 +61,7 @@ jobs:
       # Uses the pact_broker-client Ruby gem (Ruby is pre-installed on ubuntu-latest).
       # PactFlow will then cross-verify all consumer pacts against the OpenAPI spec.
       - name: Install pact-broker CLI
-        run: gem install pact_broker-client --no-document
+        run: sudo gem install pact_broker-client --no-document
 
       - name: Publish provider contract to PactFlow (BDCT)
         run: |
