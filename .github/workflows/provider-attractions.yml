@@ -49,6 +49,9 @@ jobs:
         working-directory: services/attractions-api
         run: npm install
 
+      - name: Install pact-broker CLI
+        run: npm install -g @pact-foundation/pact-node
+
       # Runs tests against the real Apollo server and writes verification-results.json
       - name: Run BDCT self-verification tests
         working-directory: services/attractions-api
