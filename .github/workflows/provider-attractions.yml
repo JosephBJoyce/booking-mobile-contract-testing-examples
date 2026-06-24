@@ -60,12 +60,12 @@ jobs:
       # Publish the OpenAPI spec AND the self-verification results to PactFlow.
       # Uses the pact_broker-client Ruby gem (Ruby is pre-installed on ubuntu-latest).
       # PactFlow will then cross-verify all consumer pacts against the OpenAPI spec.
-      - name: Install pact-broker CLI
-        run: sudo gem install pact_broker-client --no-document
+      - name: Install pactflow CLI
+        run: sudo gem install pactflow --no-document
 
       - name: Publish provider contract to PactFlow (BDCT)
         run: |
-          pact-broker publish-provider-contract \
+          pactflow publish-provider-contract \
             services/attractions-api/openapi/attractions-api.yml \
             --provider "booking-attractions-api" \
             --provider-app-version "${{ github.sha }}" \
