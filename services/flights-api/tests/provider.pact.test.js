@@ -96,15 +96,10 @@ describe('Flights API — Provider Pact Verification', () => {
         },
       },
 
-      // Request filter — injects a valid Bearer token into all provider-verification
-      // requests so the auth middleware passes. The consumer's contract already
-      // declares that Authorization must match 'Bearer .+', so this is consistent.
-      requestFilter: (req, res, next) => {
-        if (!req.headers['authorization']) {
-          req.headers['authorization'] = 'Bearer pact-provider-verification-token';
-        }
-        next();
-      },
+      // No requestFilter needed: authenticated interactions carry 'Bearer test-identity-token'
+      // in the pact (the example value from the regex matcher), so the auth middleware passes
+      // naturally. The unauthenticated interaction deliberately has no Authorization header,
+      // so the middleware correctly returns 401.
 
       logLevel: 'info',
     });

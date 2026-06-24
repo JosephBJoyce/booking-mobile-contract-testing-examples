@@ -39,6 +39,10 @@ const bookingMobileHeaders = {
   'x-booking-client': string('mobile'),
 };
 
+// ISO 8601 timestamp — matches with or without milliseconds
+const isoTimestamp = (example) =>
+  regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{4})$", example);
+
 describe('Flights API — Mobile Consumer Contract', () => {
 
   // ─── Flight Search ───────────────────────────────────────────────
@@ -66,10 +70,21 @@ describe('Flights API — Mobile Consumer Contract', () => {
             body: {
               flights: eachLike({
                 flightId: string('AMS-LHR-20250901-001'),
-                origin: string('AMS'),
-                destination: string('LHR'),
-                departureTime: datetime("yyyy-MM-dd'T'HH:mm:ssZ", '2025-09-01T06:30:00+0000'),
-                arrivalTime: datetime("yyyy-MM-dd'T'HH:mm:ssZ", '2025-09-01T07:00:00+0000'),
+                // Provider returns a full Airport object in both search and detail responses
+                origin: like({
+                  iata: string('AMS'),
+                  name: string('Amsterdam Airport Schiphol'),
+                  city: string('Amsterdam'),
+                  country: string('NL'),
+                }),
+                destination: like({
+                  iata: string('LHR'),
+                  name: string('London Heathrow Airport'),
+                  city: string('London'),
+                  country: string('GB'),
+                }),
+                departureTime: isoTimestamp('2025-09-01T06:30:00+0000'),
+                arrivalTime: isoTimestamp('2025-09-01T07:00:00+0000'),
                 durationMinutes: integer(90),
                 airline: {
                   code: string('KL'),
@@ -97,8 +112,8 @@ describe('Flights API — Mobile Consumer Contract', () => {
           });
           expect(response.status).toBe(200);
           expect(response.data.flights).toHaveLength(1);
-          expect(response.data.flights[0].origin).toBe('AMS');
-          expect(response.data.flights[0].destination).toBe('LHR');
+          expect(response.data.flights[0].origin.iata).toBe('AMS');
+          expect(response.data.flights[0].destination.iata).toBe('LHR');
         });
     });
 
@@ -118,7 +133,7 @@ describe('Flights API — Mobile Consumer Contract', () => {
               cabinClass: 'economy',
             },
             headers: {
-              // No Authorization header
+              // No Authorization header — deliberately absent
               'x-booking-language': string('en-US'),
               'x-booking-platform': string('ios'),
             },
@@ -133,7 +148,6 @@ describe('Flights API — Mobile Consumer Contract', () => {
         })
         .executeTest(async (mockServer) => {
           const client = new FlightsApiClient(mockServer.url, '');
-          // Remove the Authorization header to simulate a missing token
           delete client.client.defaults.headers.common['Authorization'];
           try {
             await client.searchFlights({
@@ -179,13 +193,13 @@ describe('Flights API — Mobile Consumer Contract', () => {
               },
               destination: {
                 iata: string('LHR'),
-                name: string("London Heathrow Airport"),
+                name: string('London Heathrow Airport'),
                 city: string('London'),
                 country: string('GB'),
                 terminal: string('4'),
               },
-              departureTime: datetime("yyyy-MM-dd'T'HH:mm:ssZ", '2025-09-01T06:30:00+0000'),
-              arrivalTime: datetime("yyyy-MM-dd'T'HH:mm:ssZ", '2025-09-01T07:00:00+0000'),
+              departureTime: isoTimestamp('2025-09-01T06:30:00+0000'),
+              arrivalTime: isoTimestamp('2025-09-01T07:00:00+0000'),
               durationMinutes: integer(90),
               airline: {
                 code: string('KL'),
@@ -198,8 +212,9 @@ describe('Flights API — Mobile Consumer Contract', () => {
                 currency: string('EUR'),
                 breakdown: {
                   baseFare: decimal(119.99),
-                  taxes: decimal(30.00),
-                  fees: decimal(0.00),
+                  // 30.0 and 0.0 serialize as integers in JSON; use like() not decimal()
+                  taxes: like(30),
+                  fees: like(0),
                 },
               },
               availableSeats: integer(42),
@@ -292,7 +307,8 @@ describe('Flights API — Mobile Consumer Contract', () => {
               },
               passengerCount: integer(1),
               contactEmail: string('jan.devries@example.com'),
-              createdAt: datetime("yyyy-MM-dd'T'HH:mm:ssZ", '2025-08-15T14:30:00+0000'),
+              // ISO 8601 with or without milliseconds
+              createdAt: isoTimestamp('2025-08-15T14:30:00.000Z'),
             },
           },
         })
