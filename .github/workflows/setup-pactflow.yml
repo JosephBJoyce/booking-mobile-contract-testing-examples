@@ -3,11 +3,11 @@
 ##
 ## Run this workflow ONCE before running the consumer/provider workflows.
 ## It registers the four pacticipants and the production + staging environments
-## in smart-bank.pactflow.io.
+## in smart-bank.pactflow.io via the PactFlow REST API (no npm install needed).
 ##
 ## Trigger manually from: Actions → PactFlow Setup → Run workflow
 ##
-## It is safe to re-run — existing pacticipants and environments are left unchanged.
+## It is safe to re-run — existing resources are left unchanged (409 = already exists).
 ##
 
 name: PactFlow Setup
@@ -25,8 +25,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
       # ─── Environments ──────────────────────────────────────────────
 
       - name: Create production environment
@@ -36,12 +34,13 @@ jobs:
             -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"name":"production","displayName":"Production","production":true}')
+          echo "Status: $STATUS"
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
             echo "✓ production environment created"
-          elif [ "$STATUS" = "409" ]; then
+          elif [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ]; then
             echo "✓ production environment already exists"
           else
-            echo "Unexpected status creating production environment: $STATUS" && exit 1
+            echo "Unexpected status: $STATUS" && exit 1
           fi
 
       - name: Create staging environment
@@ -51,54 +50,60 @@ jobs:
             -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"name":"staging","displayName":"Staging","production":false}')
+          echo "Status: $STATUS"
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
             echo "✓ staging environment created"
-          elif [ "$STATUS" = "409" ]; then
+          elif [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ]; then
             echo "✓ staging environment already exists"
           else
-            echo "Unexpected status creating staging environment: $STATUS" && exit 1
+            echo "Unexpected status: $STATUS" && exit 1
           fi
 
       # ─── Pacticipants ──────────────────────────────────────────────
 
-      - name: Install pact-broker CLI
-        run: npm install -g @pact-foundation/pact-node
-
       - name: Register booking-flights-mobile-consumer
         run: |
-          npx pact-broker create-or-update-pacticipant \
-            --name "booking-flights-mobile-consumer" \
-            --display-name "Booking Flights Mobile Consumer" \
-            --main-branch "main" \
-            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
-            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/pacticipants" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"booking-flights-mobile-consumer","displayName":"Booking Flights Mobile Consumer","mainBranch":"main"}')
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ] \
+            && echo "✓ booking-flights-mobile-consumer registered" || (echo "Failed: $STATUS" && exit 1)
 
       - name: Register booking-flights-api
         run: |
-          npx pact-broker create-or-update-pacticipant \
-            --name "booking-flights-api" \
-            --display-name "Booking Flights API" \
-            --main-branch "main" \
-            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
-            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/pacticipants" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"booking-flights-api","displayName":"Booking Flights API","mainBranch":"main"}')
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ] \
+            && echo "✓ booking-flights-api registered" || (echo "Failed: $STATUS" && exit 1)
 
       - name: Register booking-attractions-mobile-consumer
         run: |
-          npx pact-broker create-or-update-pacticipant \
-            --name "booking-attractions-mobile-consumer" \
-            --display-name "Booking Attractions Mobile Consumer" \
-            --main-branch "main" \
-            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
-            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/pacticipants" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"booking-attractions-mobile-consumer","displayName":"Booking Attractions Mobile Consumer","mainBranch":"main"}')
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ] \
+            && echo "✓ booking-attractions-mobile-consumer registered" || (echo "Failed: $STATUS" && exit 1)
 
       - name: Register booking-attractions-api
         run: |
-          npx pact-broker create-or-update-pacticipant \
-            --name "booking-attractions-api" \
-            --display-name "Booking Attractions API" \
-            --main-branch "main" \
-            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
-            --broker-token "${{ env.PACT_BROKER_TOKEN }}" || true
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "${{ env.PACT_BROKER_BASE_URL }}/pacticipants" \
+            -H "Authorization: Bearer ${{ env.PACT_BROKER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"booking-attractions-api","displayName":"Booking Attractions API","mainBranch":"main"}')
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "409" ] || [ "$STATUS" = "422" ] \
+            && echo "✓ booking-attractions-api registered" || (echo "Failed: $STATUS" && exit 1)
 
       - name: Setup complete
         run: |
@@ -107,8 +112,11 @@ jobs:
           echo "Broker: ${{ env.PACT_BROKER_BASE_URL }}"
           echo ""
           echo "Registered:"
-          echo "  Environments: production, staging"
-          echo "  Pacticipants: booking-flights-mobile-consumer, booking-flights-api,"
-          echo "                booking-attractions-mobile-consumer, booking-attractions-api"
+          echo "  Environments : production, staging"
+          echo "  Pacticipants : booking-flights-mobile-consumer"
+          echo "                 booking-flights-api"
+          echo "                 booking-attractions-mobile-consumer"
+          echo "                 booking-attractions-api"
           echo ""
-          echo "Next: run the consumer workflows, then the provider workflows."
+          echo "Next: run Consumer — Flights Mobile, then Consumer — Attractions Mobile,"
+          echo "      then the two provider workflows."
