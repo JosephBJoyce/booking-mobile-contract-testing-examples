@@ -45,13 +45,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: services/flights-api/package-lock.json
+          node-version: '22'
 
       - name: Install dependencies
         working-directory: services/flights-api
-        run: npm ci
+        run: npm install
 
       # The Verifier fetches all relevant pacts from PactFlow using:
       #   - mainBranch: true       — latest consumer main
@@ -76,7 +74,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install pact-broker CLI
         run: npm install -g @pact-foundation/pact-node

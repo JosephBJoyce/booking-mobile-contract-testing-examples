@@ -43,13 +43,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: services/attractions-api/package-lock.json
+          node-version: '22'
 
       - name: Install dependencies
         working-directory: services/attractions-api
-        run: npm ci
+        run: npm install
 
       # Runs tests against the real Apollo server and writes verification-results.json
       - name: Run BDCT self-verification tests
@@ -85,7 +83,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install pact-broker CLI
         run: npm install -g @pact-foundation/pact-node

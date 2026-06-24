@@ -34,13 +34,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: consumers/flights-mobile-consumer/package-lock.json
+          node-version: '22'
 
       - name: Install dependencies
         working-directory: consumers/flights-mobile-consumer
-        run: npm ci
+        run: npm install
 
       - name: Run Pact consumer tests
         working-directory: consumers/flights-mobile-consumer
@@ -69,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install pact-broker CLI
         run: npm install -g @pact-foundation/pact-node
