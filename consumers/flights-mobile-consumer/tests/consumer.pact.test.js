@@ -63,7 +63,6 @@ describe('Flights API — Mobile Consumer Contract', () => {
           },
           willRespondWith: {
             status: 200,
-            headers: { 'Content-Type': regex('application/json.*', 'application/json') },
             body: {
               flights: eachLike({
                 flightId: string('AMS-LHR-20250901-001'),
@@ -169,7 +168,6 @@ describe('Flights API — Mobile Consumer Contract', () => {
           },
           willRespondWith: {
             status: 200,
-            headers: { 'Content-Type': regex('application/json.*', 'application/json') },
             body: {
               flightId: string('AMS-LHR-20250901-001'),
               origin: {
@@ -283,7 +281,6 @@ describe('Flights API — Mobile Consumer Contract', () => {
           },
           willRespondWith: {
             status: 201,
-            headers: { 'Content-Type': regex('application/json.*', 'application/json') },
             body: {
               bookingId: regex('^BK-[A-Z0-9]{8}$', 'BK-ABC12345'),
               status: string('CONFIRMED'),

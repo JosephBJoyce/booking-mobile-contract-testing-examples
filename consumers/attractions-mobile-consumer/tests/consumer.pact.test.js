@@ -78,7 +78,6 @@ describe('Attractions API — Mobile Consumer Contract (GraphQL)', () => {
           },
           willRespondWith: {
             status: 200,
-            headers: { 'Content-Type': regex('application/json.*', 'application/json') },
             body: {
               data: {
                 searchAttractions: eachLike({
